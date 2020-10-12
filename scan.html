@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ohm/js in small steps</title>
+    <meta charset=utf-8>
+    <script src="~/projects/ohm/dist/ohm.js"></script>
+ 
+    <script type="text/ohm-js">
+
+
+ScmScanner {
+
+  tokens = (lparToken | rparToken | quoteToken | backQuoteToken | commaToken | commaAtToken | trueToken | falseToken | intToken | spaceToken | newlineToken | identToken | dotToken)+
+
+  delimiter = (lpar | rpar | quote | backquote | comma | commaAt | octothorpe | digit | ws | newline | dot)
+  lpar = "("
+  rpar = ")"
+  quote = "'"
+  backquote = "`"
+  commaAt = ",@"
+  comma = ~commaAt ","
+  octothorpe = "#"
+  ws = (" " | "\t")
+  newline = "\n"
+  dot = "."
+  
+  lparToken = lpar
+  rparToken = rpar
+  quoteToken = quote
+  backQuoteToken = backquote
+  commaToken = comma
+  commaAtToken = commaAt
+  trueToken = octothorpe "t"
+  falseToken = octothorpe "f"
+  intToken = digit+
+  spaceToken = space+
+  newlineToken = newline
+  dotToken = dot
+  identToken = notDelimiter+
+  notDelimiter = ~delimiter any
+  
+  }
+
+
+
+ScmScanner {
+  delimiter = (lpar | rpar | quote | backquote | comma | octothorpe | digit | ws | newline)
+  lpar = "("
+  rpar = ")"
+  quote = "'"
+  backquote = "`"
+  comma = ","
+  octothorpe = "#"
+  digit = "0" .. "9"
+  space = (" " | "\t")
+  newline = "\n"
+
+  lparToken = lpar
+  rparToken = rpar
+  quoteToken = quote
+  backQuoteToken = backquote
+  commaToken = comma
+  trueToken = octothorpe 't'
+  falseToken = octothorpe 'f'
+  intToken = digit+
+  spaceToken = space+
+  newlineToken = newline
+  identToken = notDelimiter+
+  notDelimiter = ~delimiter any
+  dotToken = &delimiter '.'
+
+  tokens = (lparToken | rparToken | quoteToken | backQuoteToken |
+    commaToken | trueToken | falseToken | intToken | spaceToken |
+    newlineToken | identToken | dotToken)+
+}
+</script>
+
+    <script>
+
+// note: . is legal as a ident character in lisp AND . can denote a dotted list ; this grammar (tokens) treats dot as a delimiter
+// but, we can add a pass that converts <ident><dot><ident> into <ident>
+
+      var tokens_grammar = ohm.grammarsFromScriptElements();
+ 
+// lparToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'lpar', string: '(', offset: prevoffset, line: line}); }, 
+// rparToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// quoteToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// backQuoteToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// commaToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// trueToken = function(_) { prevoffset = offset ; offset += 2; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// falseToken = function(_) { prevoffset = offset ; offset += 2; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// intToken = function(num) { prevoffset = offset ; offset += num.length; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// spaceToken = function(spcs) { prevoffset = offset ; offset += spcs.length; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// newlineToken = function(_) { prevoffset = offset ; line += 1; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+// dotToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+
+function displayDate () {
+  document.getElementById('timestamp').innerHTML = Date();
+}
+ 
+function generateTokens () {
+  displayDate();
+}
+
+</script>
+</head>
+
+
+  <body>
+    <button onclick="generateTokens()">Generate Tokens</button>
+    <p id="timestamp"></p>
+    <p id="result"></p>
+  </body>
+
+</html>
