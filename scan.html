@@ -1,18 +1,18 @@
 <!doctype html>
 <html>
   <head>
-    <title>ohm/js in small steps</title>
+    <title>Scheme to JS transpiler using tokens</title>
     <meta charset=utf-8>
-    <script src="~/projects/ohm/dist/ohm.js"></script>
- 
-    <script type="text/ohm-js">
+    <script src="../ohm/ohm-js/dist/ohm.js"></script>
 
+<!-- use Ohm Editor to debug grammar -->
+
+<script type="text/ohm-js">
 
 ScmScanner {
+  tokens = (lparToken | rparToken | quoteToken | backQuoteToken | commaToken | commaAtToken | trueToken | falseToken | intToken | wsToken | nlToken | identToken | dotToken)+
 
-  tokens = (lparToken | rparToken | quoteToken | backQuoteToken | commaToken | commaAtToken | trueToken | falseToken | intToken | spaceToken | newlineToken | identToken | dotToken)+
-
-  delimiter = (lpar | rpar | quote | backquote | comma | commaAt | octothorpe | digit | ws | newline | dot)
+  delimiter = (lpar | rpar | quote | backquote | comma | commaAt | octothorpe | digit | ws | nl | dot)
   lpar = "("
   rpar = ")"
   quote = "'"
@@ -21,7 +21,7 @@ ScmScanner {
   comma = ~commaAt ","
   octothorpe = "#"
   ws = (" " | "\t")
-  newline = "\n"
+  nl = "\n"
   dot = "."
   
   lparToken = lpar
@@ -33,72 +33,145 @@ ScmScanner {
   trueToken = octothorpe "t"
   falseToken = octothorpe "f"
   intToken = digit+
-  spaceToken = space+
-  newlineToken = newline
+  wsToken = ws+
+  nlToken = nl
   dotToken = dot
   identToken = notDelimiter+
   notDelimiter = ~delimiter any
   
   }
-
-
-
-ScmScanner {
-  delimiter = (lpar | rpar | quote | backquote | comma | octothorpe | digit | ws | newline)
-  lpar = "("
-  rpar = ")"
-  quote = "'"
-  backquote = "`"
-  comma = ","
-  octothorpe = "#"
-  digit = "0" .. "9"
-  space = (" " | "\t")
-  newline = "\n"
-
-  lparToken = lpar
-  rparToken = rpar
-  quoteToken = quote
-  backQuoteToken = backquote
-  commaToken = comma
-  trueToken = octothorpe 't'
-  falseToken = octothorpe 'f'
-  intToken = digit+
-  spaceToken = space+
-  newlineToken = newline
-  identToken = notDelimiter+
-  notDelimiter = ~delimiter any
-  dotToken = &delimiter '.'
-
-  tokens = (lparToken | rparToken | quoteToken | backQuoteToken |
-    commaToken | trueToken | falseToken | intToken | spaceToken |
-    newlineToken | identToken | dotToken)+
-}
 </script>
+
+<!-- 
+examples:
+(abc   t #f 'a '(a) `a `(a) `(a ,b ,@c) . d)
+-->
+<!-- should result in
+lparToken identToken wsToken trueToken wsToken falseToken wsToken quoteToken identToken wsToken quoteToken lparToken identToken rparToken wsToken backQuoteToken identToken wsToken backQuoteToken lparToken identToken rparToken wsToken backQuoteToken lparToken identToken wsToken commaToken identToken wsToken commaAtToken identToken rparTOken wsToken dotToken wsToken identToken rparToken nlToken end
+-->
 
     <script>
 
-// note: . is legal as a ident character in lisp AND . can denote a dotted list ; this grammar (tokens) treats dot as a delimiter
-// but, we can add a pass that converts <ident><dot><ident> into <ident>
+// note: . is legal as an ident character in lisp AND . can denote a dotted list
+// this grammar (tokens) treats dot as a delimiter
+// (which, strictly, is wrong, since DOT can mean two things)
+// but, we can add a later pass that converts <ident><dot><ident> into <ident>, hence, both uses of DOT can be satisfied
 
-      var tokens_grammar = ohm.grammarsFromScriptElements();
- 
-// lparToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'lpar', string: '(', offset: prevoffset, line: line}); }, 
-// rparToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// quoteToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// backQuoteToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// commaToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// trueToken = function(_) { prevoffset = offset ; offset += 2; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// falseToken = function(_) { prevoffset = offset ; offset += 2; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// intToken = function(num) { prevoffset = offset ; offset += num.length; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// spaceToken = function(spcs) { prevoffset = offset ; offset += spcs.length; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// newlineToken = function(_) { prevoffset = offset ; line += 1; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
-// dotToken = function(_) { prevoffset = offset ; offset += 1; return JSON.stringify({kind: 'rpar', string: '(', offset: prevoffset, line: line}); }, 
+  var grammars = ohm.grammarsFromScriptElements();
+  var token_grammar = grammars['ScmScanner'];
+  var token_semantics = token_grammar.createSemantics();
+  var offset = 0; 
+  var line = 1; 
+  var prevOffset;
+  token_semantics.addOperation(
+      'createToken',
+    {
+      tokens : function(tokenList) { 
+         var result = tokenList.createToken();
+         return result.join('<br>');
+      }, 
+      lparToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'lpar', text: '(', offset: prevOffset, line: line});
+      },
+      rparToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'rpar', text: ')', offset: prevOffset, line: line});
+      },
+      quoteToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'quote', text: "'", offset: prevOffset, line: line});
+      }, 
+      backQuoteToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'backquote', text: '`', offset: prevOffset, line: line});
+      }, 
+      commaToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'comma', text: ',', offset: prevOffset, line: line});
+      },
+      commaAtToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'commaAt', text: ',@', offset: prevOffset, line: line});
+      }, 
+      trueToken : function(_octothorpe, _) {
+	  prevOffset = offset ;
+	  offset += 2;
+	  return JSON.stringify({kind: 'true', text: '#t', offset: prevOffset, line: line});
+      }, 
+      falseToken : function(_octothorpe, _) {
+	  prevOffset = offset ;
+	  offset += 2;
+	  return JSON.stringify({kind: 'false', text: '#f', offset: prevOffset, line: line});
+      }, 
+      intToken : function(num) {
+	  prevOffset = offset ;
+	  offset += num.getText().length;
+	  return JSON.stringify({kind: 'int', text: num.getText().join(''), offset: prevOffset, line: line});
+      }, 
+      wsToken : function(spcs) {
+	  prevOffset = offset ;
+	  offset += spcs.getText().length;
+	  return JSON.stringify({kind: 'ws', text: spcs.getText().join(''), offset: prevOffset, line: line});
+      }, 
+      nlToken : function(_) {
+	  prevOffset = offset ;
+	  line += 1;
+	  offset = 0;
+	  return JSON.stringify({kind: 'nl', text: '\n', offset: prevOffset, line: line});
+      }, 
+      dotToken : function(_) {
+	  prevOffset = offset ;
+	  offset += 1;
+	  return JSON.stringify({kind: 'dot', text: '.', offset: prevOffset, line: line});
+      }, 
+      identToken : function(cs) {
+	  prevOffset = offset ;
+	  offset += cs.getText().length;
+	  return JSON.stringify({kind: 'ident', text: cs.getText().join(''), offset: prevOffset, line: line});
+      },
+      _terminal : function() {return this.primitiveValue;}
+});
+
+  token_semantics.addOperation(
+      'getText',
+    {
+      lpar: function(c) {return "(";},
+      rpar: function(c) {return ")";},
+      quote: function(c) {return "'";},
+      backquote: function(c) {return "`";},
+      commaAt: function(c) {return ",@";},
+      comma: function(c) {return ",";},
+      octothorpe: function(c) {return "#";},
+      ws: function(c) {return " ";},
+      nl: function(c) {return "\n";},
+      dot: function(c) {return ".";},
+      _terminal : function() {return this.primitiveValue;}
+    });
 
 function displayDate () {
   document.getElementById('timestamp').innerHTML = Date();
 }
  
+function displayResult (s) {
+  document.getElementById('result').innerHTML = s + "<br>";
+}
+ 
 function generateTokens () {
+  var testString;
+  testString = "(abc   #t #f 'a '(a) `a `(a) `(a ,b ,@c) . d)\n"; 
+  var matchResult = token_grammar.match(testString);
+  if (matchResult.failed()) {
+    displayResult("match failed");
+  } else {
+    displayResult(token_semantics(matchResult).createToken());
+  }
   displayDate();
 }
 
