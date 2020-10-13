@@ -1,0 +1,6 @@
+* tokenize
+* webworker(tokenize) -> webworker(1) -> webworker(2), etc.
+* how to override a pattern and leave the rest
+* delete ws & nl 
+* unquote
+* unbackquote
